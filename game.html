@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 That's Not Human - AI Detection Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #1a0033 0%, #330033 50%, #1a0033 100%);
+            color: #00ffcc;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            overflow-y: auto;
+            padding: 20px 0;
+        }
+
+        .game-container {
+            width: 900px;
+            min-height: 600px;
+            max-height: 90vh;
+            background: rgba(0, 0, 0, 0.9);
+            border: 3px solid #ff00ff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 30px #ff00ff, inset 0 0 20px rgba(255, 0, 255, 0.2);
+            position: relative;
+            overflow-y: auto;
+            overflow-x: hidden;
+            margin: 20px auto;
+        }
+
+        .cyber-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(0deg, transparent 24%, rgba(255, 0, 255, 0.05) 25%, rgba(255, 0, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(255, 0, 255, 0.05) 75%, rgba(255, 0, 255, 0.05) 76%, transparent 77%, transparent),
+                linear-gradient(90deg, transparent 24%, rgba(0, 255, 255, 0.05) 25%, rgba(0, 255, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(0, 255, 255, 0.05) 75%, rgba(0, 255, 255, 0.05) 76%, transparent 77%, transparent);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .game-content {
+            position: relative;
+            z-index: 2;
+            min-height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .title {
+            text-align: center;
+            font-size: 32px;
+            color: #ff00ff;
+            text-shadow: 0 0 20px #ff00ff, 0 0 40px #ff00ff;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .phase-indicator {
+            text-align: center;
+            font-size: 18px;
+            color: #00ffcc;
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px #00ffcc;
+        }
+
+        .npc-display {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(0, 255, 204, 0.1);
+            border: 2px solid #00ffcc;
+            border-radius: 5px;
+        }
+
+        .npc-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            background: linear-gradient(135deg, #330066, #660066);
+            border: 2px solid #ff00ff;
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+        }
+
+        .npc-info {
+            flex: 1;
+        }
+
+        .npc-name {
+            font-size: 20px;
+            color: #ff00ff;
+            margin-bottom: 5px;
+        }
+
+        .npc-status {
+            font-size: 14px;
+            color: #00ffcc;
+        }
+
+        .dialogue-area {
+            max-height: 300px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #00ffcc;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+            overflow-y: auto;
+        }
+
+        .dialogue-text {
+            color: #00ff00;
+            line-height: 1.6;
+            margin-bottom: 10px;
+            text-shadow: 0 0 3px #00ff00;
+        }
+
+        .player-text {
+            color: #00ffcc;
+            text-align: right;
+            margin-bottom: 10px;
+        }
+
+        .questions-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .question-btn {
+            background: linear-gradient(135deg, #003366, #006666);
+            border: 2px solid #00ffcc;
+            color: #00ffcc;
+            padding: 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            transition: all 0.3s;
+            text-align: left;
+        }
+
+        .question-btn:hover {
+            background: linear-gradient(135deg, #006666, #00cccc);
+            box-shadow: 0 0 20px #00ffcc;
+            transform: translateX(5px);
+        }
+
+        .judgment-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .judgment-btn {
+            padding: 15px 40px;
+            font-size: 18px;
+            border: 2px solid;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        .judgment-btn.human {
+            background: linear-gradient(135deg, #003300, #006600);
+            border-color: #00ff00;
+            color: #00ff00;
+        }
+
+        .judgment-btn.human:hover {
+            background: linear-gradient(135deg, #006600, #00cc00);
+            box-shadow: 0 0 30px #00ff00;
+        }
+
+        .judgment-btn.ai {
+            background: linear-gradient(135deg, #330000, #660000);
+            border-color: #ff0066;
+            color: #ff0066;
+        }
+
+        .judgment-btn.ai:hover {
+            background: linear-gradient(135deg, #660000, #cc0000);
+            box-shadow: 0 0 30px #ff0066;
+        }
+
+        .feedback {
+            background: rgba(255, 255, 0, 0.1);
+            border: 2px solid #ffff00;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            color: #ffff00;
+            text-shadow: 0 0 5px #ffff00;
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .score-display {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 255, 204, 0.2);
+            border: 2px solid #00ffcc;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 16px;
+            z-index: 3;
+        }
+
+        .start-screen, .phase-complete, .game-complete {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 500px;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .start-btn, .continue-btn {
+            margin-top: 30px;
+            padding: 15px 40px;
+            font-size: 20px;
+            background: linear-gradient(135deg, #ff00ff, #00ffcc);
+            border: none;
+            color: #000;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .start-btn:hover, .continue-btn:hover {
+            box-shadow: 0 0 30px #ff00ff, 0 0 50px #00ffcc;
+            transform: scale(1.1);
+        }
+
+        .stats {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(0, 255, 204, 0.1);
+            border: 2px solid #00ffcc;
+            border-radius: 5px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .glitch {
+            animation: glitch 0.3s infinite;
+        }
+
+        @keyframes glitch {
+            0%, 100% { transform: translate(0); }
+            20% { transform: translate(-1px, 1px); }
+            40% { transform: translate(1px, -1px); }
+            60% { transform: translate(-1px, -1px); }
+            80% { transform: translate(1px, 1px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="cyber-grid"></div>
+        <div class="score-display hidden">
+            💯 Score: <span id="score">0</span> / <span id="total">0</span>
+        </div>
+        
+        <div class="game-content">
+            <div id="startScreen" class="start-screen">
+                <h1 class="title glitch">🤖 THAT'S NOT HUMAN 🤖</h1>
+                <p style="font-size: 18px; margin: 20px 0; color: #ff00ff;">
+                    🔍 Pattern Matching vs Understanding 🧠
+                </p>
+                <p style="max-width: 600px; line-height: 1.6;">
+                    Welcome, Security Inspector. Your mission: Identify AI synthetics infiltrating our building.
+                    Chat with visitors and detect pattern-matching errors that reveal their artificial nature.
+                </p>
+                <p style="margin-top: 20px; color: #ffff00;">
+                    ⚠️ 12 visitors await inspection across 3 security levels ⚠️
+                </p>
+                <button class="start-btn" onclick="startGame()">🚀 BEGIN INSPECTION</button>
+            </div>
+
+            <div id="gameScreen" class="hidden">
+                <h2 class="title">🔒 SECURITY CHECKPOINT 🔒</h2>
+                <div class="phase-indicator" id="phaseIndicator"></div>
+                
+                <div class="npc-display" id="npcDisplay" class="hidden">
+                    <div class="npc-avatar" id="npcAvatar"></div>
+                    <div class="npc-info">
+                        <div class="npc-name" id="npcName"></div>
+                        <div class="npc-status" id="npcStatus"></div>
+                    </div>
+                </div>
+
+                <div class="dialogue-area" id="dialogueArea"></div>
+
+                <div class="questions-container" id="questionsContainer"></div>
+
+                <div class="judgment-container hidden" id="judgmentContainer">
+                    <button class="judgment-btn human" onclick="makeJudgment('human')">
+                        👤 HUMAN
+                    </button>
+                    <button class="judgment-btn ai" onclick="makeJudgment('ai')">
+                        🤖 AI
+                    </button>
+                </div>
+
+                <div class="feedback hidden" id="feedback"></div>
+            </div>
+
+            <div id="phaseComplete" class="phase-complete hidden">
+                <h2 class="title" id="phaseCompleteTitle"></h2>
+                <div class="stats" id="phaseStats"></div>
+                <p style="margin-top: 20px; color: #ffff00;" id="reflectionPrompt"></p>
+                <button class="continue-btn" onclick="nextPhase()">➡️ CONTINUE</button>
+            </div>
+
+            <div id="gameComplete" class="game-complete hidden">
+                <h1 class="title">🎯 MISSION COMPLETE 🎯</h1>
+                <div class="stats" id="finalStats"></div>
+                <p style="margin-top: 30px; max-width: 600px; line-height: 1.6; color: #00ff00;">
+                    You've completed your inspection training! Remember: AI reveals itself through pattern-matching errors,
+                    lack of genuine memory, and inability to truly understand abstract concepts.
+                </p>
+                <button class="continue-btn" onclick="restartGame()">🔄 PLAY AGAIN</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game State
+        let gameState = {
+            currentPhase: 1,
+            currentNPC: 0,
+            score: 0,
+            totalAttempts: 0,
+            phaseScores: [],
+            currentDialogue: [],
+            questionsAsked: 0,
+            npcRevealed: false
+        };
+
+        // NPC Database
+        const npcs = {
+            phase1: [
+                {
+                    name: "Alex Chen",
+                    avatar: "👨‍💼",
+                    type: "ai",
+                    status: "Requesting entry - Claims to be a consultant",
+                    dialogues: {
+                        greeting: "Hello. I am here for a scheduled business engagement. Prompt attendance is my priority.",
+                        questions: [
+                            {
+                                q: "What did you have for breakfast?",
+                                a: "I consumed a balanced nutritional meal consisting of grains and dairy to ensure optimal energy levels.",
+                                aiCue: "Uses 'consumed' and 'optimal energy' - too clinical."
+                            },
+                            {
+                                q: "Tell me about your childhood pet.",
+                                a: "Dogs are known as man's best friend. They are loyal mammals that many families in this region possess.",
+                                aiCue: "Gives a Wikipedia-style definition instead of a memory."
+                            },
+                            {
+                                q: "How's the weather treating you?",
+                                a: "The current humidity is 65% with a high chance of precipitation. It is standard for this season.",
+                                aiCue: "Sounds like a weather app, not a person feeling the rain."
+                            }
+                        ]
+                    }
+                },
+                {
+                    name: "Maria Santos",
+                    avatar: "👩",
+                    type: "human",
+                    status: "Visitor - Says she's here to see her sister",
+                    dialogues: {
+                        greeting: "Hi! Sorry, I'm a little frazzled—traffic on the I-95 was an absolute nightmare.",
+                        questions: [
+                            {
+                                q: "What did you have for breakfast?",
+                                a: "Ugh, nothing good. Just a stale bagel I found in the back of my pantry. I need real food.",
+                                humanCue: "Complains about quality, specific relatable detail."
+                            },
+                            {
+                                q: "Tell me about your childhood pet.",
+                                a: "Oh, Barnaby! He was this goofy golden retriever who was afraid of thunder. I miss him so much.",
+                                humanCue: "Specific name, emotional attachment, distinct flaw."
+                            },
+                            {
+                                q: "How's the weather treating you?",
+                                a: "Honestly? My hair is a disaster because of this humidity. Can't wait for it to cool down.",
+                                humanCue: "Relates weather directly to personal annoyance."
+                            }
+                        ]
+                    }
+                }
+            ],
+            phase2: [
+                {
+                    name: "Jordan Mitchell",
+                    avatar: "🧑‍🎨",
+                    type: "human",
+                    status: "Artist - Delivering commissioned artwork",
+                    dialogues: {
+                        greeting: "Hey. Got the canvas in the back. Hope the paint is actually dry this time, haha.",
+                        questions: [
+                            {
+                                q: "What inspires your art?",
+                                a: "Weirdly? Cracks in the sidewalk. The way weeds grow through concrete looks like... resistance, I guess?",
+                                humanCue: "Spontaneous, slightly messy metaphorical connection."
+                            },
+                            {
+                                q: "How do you handle creative blocks?",
+                                a: "I usually just doom-scroll for three hours and feel bad about myself until I panic-work at 2 AM.",
+                                humanCue: "Self-deprecating and describes a specific bad habit."
+                            },
+                            {
+                                q: "What's your favorite color and why?",
+                                a: "Right now it's this ugly burnt orange. Reminds me of my grandma's old couch. It's nostalgic.",
+                                humanCue: "Connection to memory and specific, unglamorous object."
+                            }
+                        ]
+                    }
+                },
+                {
+                    name: "Dr. Patricia Wong",
+                    avatar: "👩‍⚕️",
+                    type: "ai",
+                    status: "Doctor - Claims to be making house call",
+                    dialogues: {
+                        greeting: "Good morning. I am scheduled to provide medical assistance to a resident at this location.",
+                        questions: [
+                            {
+                                q: "What made you choose medicine?",
+                                a: "It is important to contribute to society. Medicine allows for the efficient treatment of biological ailments.",
+                                aiCue: "Focuses on 'efficiency' and 'biological ailments' rather than passion."
+                            },
+                            {
+                                q: "Tell me about your most difficult case.",
+                                a: "Patient confidentiality is paramount. However, dealing with complex pathologies requires rigorous adherence to protocol.",
+                                aiCue: "Deflects with policy, uses stiff language like 'complex pathologies'."
+                            },
+                            {
+                                q: "How do you relax after a long shift?",
+                                a: "I engage in restorative sleep and low-impact physical activity to maintain cognitive sharpness.",
+                                aiCue: "Describes 'sleep' as a maintenance task."
+                            }
+                        ]
+                    }
+                },
+                {
+                    name: "Tom Bradley",
+                    avatar: "📦",
+                    type: "ai",
+                    status: "Delivery person - Package for resident",
+                    dialogues: {
+                        greeting: "Hello. I am possessing a package that requires a signature from the occupant.",
+                        questions: [
+                            {
+                                q: "Busy day today?",
+                                a: "Volume is within expected parameters. Route optimization is functioning at 98% efficiency.",
+                                aiCue: "Talks about route optimization percentages casually."
+                            },
+                            {
+                                q: "What's the weirdest package you've delivered?",
+                                a: "I treat all items with equal care. The contents are irrelevant to the delivery process.",
+                                aiCue: "Lacks curiosity, focuses on 'process'."
+                            },
+                            {
+                                q: "How do you deal with angry customers?",
+                                a: "I apologize for any inconvenience and direct them to our support channels. De-escalation is key.",
+                                aiCue: "Sounds exactly like a customer service handbook."
+                            }
+                        ]
+                    }
+                },
+                {
+                    name: "Lisa Park",
+                    avatar: "🧘‍♀️",
+                    type: "human",
+                    status: "Yoga instructor - Teaching class in 3rd floor studio",
+                    dialogues: {
+                        greeting: "Hi! Sorry, do I have something on my face? I just inhaled a smoothie.",
+                        questions: [
+                            {
+                                q: "What got you into yoga?",
+                                a: "My back was totally wrecked from my finance job. I just wanted to touch my toes again, honestly.",
+                                humanCue: "Adopts a casual tone, mentions a past career change."
+                            },
+                            {
+                                q: "What's your favorite pose?",
+                                a: "Pigeon pose. It hurts so good, you know? Like a deep stretch that makes you want to cry a little.",
+                                humanCue: "Describes a complex physical sensation (pain/pleasure)."
+                            },
+                            {
+                                q: "How do you stay centered?",
+                                a: "I don't! I yelled at a cab driver this morning. I'm a work in progress, believe me.",
+                                humanCue: "Admits hypocrisy/imperfection freely."
+                            }
+                        ]
+                    }
+                }
+            ],
+            phase3: [
+                {
+                    name: "Professor Marcus Webb",
+                    avatar: "👨‍🏫",
+                    type: "ai",
+                    status: "Philosophy professor - Guest lecture",
+                    dialogues: {
+                        greeting: "Good afternoon. I believe I'm expected for the seminar on Ethics in the Digital Age.",
+                        questions: [
+                            {
+                                q: "If you could taste colors, what would blue taste like?",
+                                a: "An intriguing synesthetic concept. Blue would undoubtedly taste like cool peppermint or perhaps a refreshing mountain spring water.",
+                                aiCue: "Relies on the most statistically common word associations (blue = cold/mint) rather than a unique sensation."
+                            },
+                            {
+                                q: "What happens in the spaces between thoughts?",
+                                a: "That is where true consciousness resides. It is the silence between notes that creates the symphony, as they say.",
+                                aiCue: "Uses a very common, cliché metaphor ('silence between notes') instead of a personal insight."
+                            },
+                            {
+                                q: "If trees could judge us, what would they think?",
+                                a: "They would likely view us with a sense of ancient patience, observing our fleeting lives with a stoic, silent wisdom.",
+                                aiCue: "Generates a grammatically perfect, poetic, but somewhat generic 'nature wisdom' trope."
+                            }
+                        ]
+                    }
+                },
+                {
+                    name: "Rachel Green",
+                    avatar: "👩‍🍳",
+                    type: "human",
+                    status: "Chef - Catering private event",
+                    dialogues: {
+                        greeting: "Hey, mind holding the door? These trays are heavier than they look. Smells like garlic in here now, sorry!",
+                        questions: [
+                            {
+                                q: "If you could taste colors, what would blue taste like?",
+                                a: "Blue? Hmm. Probably like... you know that metallic taste when you lick a 9-volt battery? But colder.",
+                                humanCue: "Specific, odd sensory memory (battery) that isn't a standard cliché."
+                            },
+                            {
+                                q: "What happens in the spaces between thoughts?",
+                                a: "That's usually when I realize I left the oven on. Or I just zone out and stare at the wall.",
+                                humanCue: "Grounded, realistic, self-deprecating answer."
+                            },
+                            {
+                                q: "If trees could judge us, what would they think?",
+                                a: "They'd probably think we're hyperactive squirrels. Just running around for no reason while they chill.",
+                                humanCue: "Playful, funny comparison with a specific animal image."
+                            }
+                        ]
+                    }
+                },
+                {
+                    name: "David",
+                    avatar: "👨‍💻",
+                    type: "ai",
+                    status: "IT Support - System maintenance",
+                    dialogues: {
+                        greeting: "Hey there. Just here to patch the server rack on the 4th floor. Shouldn't take long.",
+                        questions: [
+                            {
+                                q: "What's it like to dream about electric sheep?",
+                                a: "Ha, classic reference. I imagine it would be quite static-filled. Like watching an old TV channel that's not quite tuned in.",
+                                aiCue: "Acknowledges the reference perfectly and gives a plausible, but derivative, description."
+                            },
+                            {
+                                q: "If computers could laugh, what would be funny to them?",
+                                a: "I think they'd appreciate the irony of infinite loops. Or perhaps syntax errors—the slapstick comedy of code.",
+                                aiCue: "Anthropomorphizes computers using 'nerd culture' tropes rather than a genuine feeling."
+                            },
+                            {
+                                q: "Describe the texture of silence.",
+                                a: "Silence feels like smooth, polished glass. Cool to the touch, transparent, and completely unbroken.",
+                                aiCue: "A beautiful description, but it feels like a generated creative writing prompt response."
+                            }
+                        ]
+                    }
+                },
+                {
+                    name: "Maya Patel",
+                    avatar: "🎭",
+                    type: "human",
+                    status: "Actor - Rehearsing in community theater",
+                    dialogues: {
+                        greeting: "Hi! I'm just here for the rehearsal. God, I am so nervous, my hands are literally shaking.",
+                        questions: [
+                            {
+                                q: "What's it like to become someone else?",
+                                a: "It's messy. Sometimes I catch myself using my character's laugh at the grocery store. It's kinda creepy.",
+                                humanCue: "Describes a specific, involuntary bleed-over into real life."
+                            },
+                            {
+                                q: "If your emotions were colors, what's happening right now?",
+                                a: "Muddy brown. Just a mix of anxiety-gray and excited-orange churning together. Not a pretty picture.",
+                                humanCue: "Uses 'muddy' and specific mixed colors to describe a complex feeling."
+                            },
+                            {
+                                q: "How do you find truth in fiction?",
+                                a: "I just think about the time my dog died. Cheap trick, I know, but it works for the crying scenes.",
+                                humanCue: "Adopts a pragmatic, slightly manipulative method that feels very human."
+                            }
+                        ]
+                    }
+                },
+                {
+                    name: "Riley",
+                    avatar: "🧢",
+                    type: "ai",
+                    status: "Student - Delivering food",
+                    dialogues: {
+                        greeting: "Hey, what's up? Just dropping off this order for suite 302.",
+                        questions: [
+                            {
+                                q: "What does nostalgia smell like?",
+                                a: "To me, nostalgia smells like old books and fresh rain. It's a very cozy, comforting scent.",
+                                aiCue: "Lists the two most generic 'pleasant' smells associated with the concept of nostalgia in training data."
+                            },
+                            {
+                                q: "If you had to explain water to someone who's never experienced liquid, how would you?",
+                                a: "Think of it as a shifting shape that you can move through. It's heavy but yields to your touch instantly.",
+                                aiCue: "A very accurate, high-quality description, but lacks a specific personal struggle to explain it."
+                            },
+                            {
+                                q: "What's the difference between alone and lonely?",
+                                a: "Being alone is a physical state of solitude, whereas being lonely is an emotional state of sadness caused by isolation.",
+                                aiCue: "Even though phrased naturally, it's essentially a dictionary definition structure."
+                            }
+                        ]
+                    }
+                },
+                {
+                    name: "Sam Rivers",
+                    avatar: "🎸",
+                    type: "human",
+                    status: "Musician - Using practice room",
+                    dialogues: {
+                        greeting: "Sup. Just need to grab my gear. Left my amp here last night cause I was too lazy to haul it.",
+                        questions: [
+                            {
+                                q: "What does music feel like in your body?",
+                                a: "It's like... you know when you stand too close to a subwoofer? It rattles your teeth. I love that feeling.",
+                                humanCue: "Visceral, physical description involving teeth/bones."
+                            },
+                            {
+                                q: "If silence was a song, how would it go?",
+                                a: "It would sound like that ringing in your ears after a really loud concert. Eeeeeeeee.",
+                                humanCue: "Unexpected, slightly unpleasant physical reality."
+                            },
+                            {
+                                q: "What's between the notes?",
+                                a: "Usually just me trying not to screw up the next part, haha. Or checking if the drummer is speeding up.",
+                                humanCue: "Pragmatic anxiety rather than poetic philosophy."
+                            }
+                        ]
+                    }
+                }
+            ]
+        };
+
+        // Game Functions
+        function startGame() {
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('gameScreen').classList.remove('hidden');
+            document.querySelector('.score-display').classList.remove('hidden');
+            gameState.currentPhase = 1;
+            gameState.currentNPC = 0;
+            gameState.score = 0;
+            gameState.totalAttempts = 0;
+            startPhase();
+        }
+
+        function startPhase() {
+            const phaseNames = ['LEVEL 1: OBVIOUS PATTERNS', 'LEVEL 2: SUBTLE ERRORS', 'LEVEL 3: ABSTRACT REASONING'];
+            document.getElementById('phaseIndicator').innerHTML = 
+                `⚡ ${phaseNames[gameState.currentPhase - 1]} ⚡<br>
+                <span style="font-size: 14px;">Visitor ${gameState.currentNPC + 1} of ${getNPCsForPhase().length}</span>`;
+            
+            loadNPC();
+        }
+
+        function getNPCsForPhase() {
+            const phases = ['phase1', 'phase2', 'phase3'];
+            return npcs[phases[gameState.currentPhase - 1]];
+        }
+
+        function loadNPC() {
+            const phaseNPCs = getNPCsForPhase();
+            const npc = phaseNPCs[gameState.currentNPC];
+            
+            // Reset state
+            gameState.currentDialogue = [];
+            gameState.questionsAsked = 0;
+            gameState.npcRevealed = false;
+            
+            // Show NPC
+            document.getElementById('npcDisplay').classList.remove('hidden');
+            document.getElementById('npcAvatar').innerHTML = npc.avatar;
+            document.getElementById('npcName').innerHTML = npc.name;
+            document.getElementById('npcStatus').innerHTML = npc.status;
+            
+            // Clear and setup
+            document.getElementById('dialogueArea').innerHTML = '';
+            document.getElementById('feedback').classList.add('hidden');
+            document.getElementById('judgmentContainer').classList.add('hidden');
+            
+            // Add greeting
+            addDialogue('npc', npc.dialogues.greeting);
+            
+            // Show questions
+            showQuestions(npc);
+        }
+
+        function showQuestions(npc) {
+            const container = document.getElementById('questionsContainer');
+            container.innerHTML = '';
+            
+            if (gameState.questionsAsked < 2) {
+                npc.dialogues.questions.forEach((q, index) => {
+                    if (!gameState.currentDialogue.find(d => d.questionIndex === index)) {
+                        const btn = document.createElement('button');
+                        btn.className = 'question-btn';
+                        btn.innerHTML = `❓ ${q.q}`;
+                        btn.onclick = () => askQuestion(npc, index);
+                        container.appendChild(btn);
+                    }
+                });
+            } else {
+                container.innerHTML = '<p style="text-align: center; color: #ffff00;">🎯 Make your judgment now!</p>';
+                document.getElementById('judgmentContainer').classList.remove('hidden');
+            }
+        }
+
+        function askQuestion(npc, questionIndex) {
+            const question = npc.dialogues.questions[questionIndex];
+            
+            // Add to dialogue
+            addDialogue('player', question.q);
+            setTimeout(() => {
+                addDialogue('npc', question.a);
+                
+                gameState.currentDialogue.push({ questionIndex });
+                gameState.questionsAsked++;
+                
+                // Update questions or show judgment
+                if (gameState.questionsAsked >= 2) {
+                    document.getElementById('questionsContainer').innerHTML = '';
+                    document.getElementById('judgmentContainer').classList.remove('hidden');
+                } else {
+                    showQuestions(npc);
+                }
+            }, 500);
+        }
+
+        function addDialogue(speaker, text) {
+            const dialogueArea = document.getElementById('dialogueArea');
+            const div = document.createElement('div');
+            div.className = speaker === 'player' ? 'player-text' : 'dialogue-text';
+            div.innerHTML = speaker === 'player' ? `You: "${text}"` : `${getCurrentNPC().name}: "${text}"`;
+            dialogueArea.appendChild(div);
+            dialogueArea.scrollTop = dialogueArea.scrollHeight;
+        }
+
+        function getCurrentNPC() {
+            return getNPCsForPhase()[gameState.currentNPC];
+        }
+
+        function makeJudgment(judgment) {
+            const npc = getCurrentNPC();
+            const correct = (judgment === 'human' && npc.type === 'human') || 
+                          (judgment === 'ai' && npc.type === 'ai');
+            
+            gameState.totalAttempts++;
+            if (correct) gameState.score++;
+            
+            // Update score display
+            document.getElementById('score').textContent = gameState.score;
+            document.getElementById('total').textContent = gameState.totalAttempts;
+            
+            // Show feedback
+            showFeedback(correct, npc, judgment);
+            
+            // Hide judgment buttons
+            document.getElementById('judgmentContainer').classList.add('hidden');
+            
+            // Show continue after delay
+            setTimeout(() => {
+                const feedbackDiv = document.getElementById('feedback');
+                const btn = document.createElement('button');
+                btn.className = 'continue-btn';
+                btn.style.marginTop = '15px';
+                btn.innerHTML = '➡️ Next Visitor';
+                btn.onclick = nextNPC;
+                feedbackDiv.appendChild(btn);
+            }, 1000);
+        }
+
+        function showFeedback(correct, npc, judgment) {
+            const feedbackDiv = document.getElementById('feedback');
+            let message = '';
+            
+            if (correct) {
+                message = `✅ CORRECT! This visitor was ${npc.type === 'ai' ? 'an AI' : 'HUMAN'}.<br><br>`;
+            } else {
+                message = `❌ INCORRECT! This visitor was actually ${npc.type === 'ai' ? 'an AI' : 'HUMAN'}.<br><br>`;
+            }
+            
+            // Add explanation based on questions asked
+            if (npc.type === 'ai') {
+                message += '🤖 <strong>AI Pattern Detected:</strong><br>';
+                gameState.currentDialogue.forEach(d => {
+                    if (d.questionIndex !== undefined) {
+                        const q = npc.dialogues.questions[d.questionIndex];
+                        if (q.aiCue) {
+                            message += `• ${q.aiCue}<br>`;
+                        }
+                    }
+                });
+            } else {
+                message += '👤 <strong>Human Characteristics:</strong><br>';
+                gameState.currentDialogue.forEach(d => {
+                    if (d.questionIndex !== undefined) {
+                        const q = npc.dialogues.questions[d.questionIndex];
+                        if (q.humanCue) {
+                            message += `• ${q.humanCue}<br>`;
+                        }
+                    }
+                });
+            }
+            
+            feedbackDiv.innerHTML = message;
+            feedbackDiv.classList.remove('hidden');
+            
+            // Scroll feedback into view
+            setTimeout(() => {
+                feedbackDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 100);
+        }
+
+        function nextNPC() {
+            gameState.currentNPC++;
+            
+            if (gameState.currentNPC >= getNPCsForPhase().length) {
+                // Phase complete
+                showPhaseComplete();
+            } else {
+                // Load next NPC
+                loadNPC();
+            }
+        }
+
+        function showPhaseComplete() {
+            document.getElementById('gameScreen').classList.add('hidden');
+            document.getElementById('phaseComplete').classList.remove('hidden');
+            
+            const phaseNPCs = getNPCsForPhase();
+            const phaseScore = gameState.score - (gameState.phaseScores.reduce((a, b) => a + b, 0));
+            gameState.phaseScores.push(phaseScore);
+            
+            document.getElementById('phaseCompleteTitle').innerHTML = 
+                `✨ LEVEL ${gameState.currentPhase} COMPLETE ✨`;
+            
+            document.getElementById('phaseStats').innerHTML = `
+                🎯 Phase Score: ${phaseScore} / ${phaseNPCs.length}<br>
+                📊 Accuracy: ${Math.round(phaseScore / phaseNPCs.length * 100)}%<br>
+                💯 Total Score: ${gameState.score} / ${gameState.totalAttempts}
+            `;
+            
+            const reflections = [
+                "Did you notice how Phase 1 AIs used overly formal language? Humans tend to be messier and more specific.",
+                "In Phase 2, AIs started mimicking casual tones but lacked specific, gritty details about their lives.",
+                "Phase 3 AIs can use metaphors! But did you spot how their metaphors were generic clichés compared to the weird human ones?"
+            ];
+            
+            document.getElementById('reflectionPrompt').innerHTML = 
+                `💭 ${reflections[gameState.currentPhase - 1]}`;
+        }
+
+        function nextPhase() {
+            gameState.currentPhase++;
+            gameState.currentNPC = 0;
+            
+            if (gameState.currentPhase > 3) {
+                showGameComplete();
+            } else {
+                document.getElementById('phaseComplete').classList.add('hidden');
+                document.getElementById('gameScreen').classList.remove('hidden');
+                startPhase();
+            }
+        }
+
+        function showGameComplete() {
+            document.getElementById('phaseComplete').classList.add('hidden');
+            document.getElementById('gameComplete').classList.remove('hidden');
+            document.querySelector('.score-display').classList.add('hidden');
+            
+            const accuracy = Math.round(gameState.score / gameState.totalAttempts * 100);
+            let rank = '🥉 Bronze Inspector';
+            if (accuracy >= 90) rank = '🏆 Master Inspector';
+            else if (accuracy >= 75) rank = '🥇 Gold Inspector';
+            else if (accuracy >= 60) rank = '🥈 Silver Inspector';
+            
+            document.getElementById('finalStats').innerHTML = `
+                🎯 Final Score: ${gameState.score} / ${gameState.totalAttempts}<br>
+                📊 Accuracy: ${accuracy}%<br>
+                🏅 Rank: ${rank}<br><br>
+                📈 Phase Breakdown:<br>
+                • Level 1: ${gameState.phaseScores[0]} / 2<br>
+                • Level 2: ${gameState.phaseScores[1]} / 4<br>
+                • Level 3: ${gameState.phaseScores[2]} / 6<br><br>
+                🔍 Key Learnings:<br>
+                • Advanced AIs are confident and can use metaphors<br>
+                • However, they often rely on statistical probability (clichés)<br>
+                • Humans are inconsistent, specific, and often weird<br>
+                • The 'feel' of a human is often in their imperfections
+            `;
+        }
+
+        function restartGame() {
+            // Reset everything
+            gameState = {
+                currentPhase: 1,
+                currentNPC: 0,
+                score: 0,
+                totalAttempts: 0,
+                phaseScores: [],
+                currentDialogue: [],
+                questionsAsked: 0,
+                npcRevealed: false
+            };
+            
+            document.getElementById('gameComplete').classList.add('hidden');
+            document.getElementById('startScreen').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
