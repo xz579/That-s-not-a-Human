@@ -162,12 +162,19 @@
             font-size: 14px;
             transition: all 0.3s;
             text-align: left;
+            position: relative;
+            overflow: hidden;
         }
 
         .question-btn:hover {
             background: linear-gradient(135deg, #006666, #00cccc);
             box-shadow: 0 0 20px #00ffcc;
             transform: translateX(5px);
+        }
+
+        /* Click ripple effect */
+        .question-btn:active {
+            transform: scale(0.98);
         }
 
         .judgment-container {
@@ -225,16 +232,96 @@
             to { opacity: 1; }
         }
 
-        .score-display {
+        .header-controls {
             position: absolute;
             top: 20px;
             right: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+            z-index: 3;
+        }
+
+        .score-display {
             background: rgba(0, 255, 204, 0.2);
             border: 2px solid #00ffcc;
-            padding: 10px 20px;
+            padding: 5px 15px;
             border-radius: 5px;
             font-size: 16px;
-            z-index: 3;
+            margin-bottom: 5px;
+        }
+
+        .audio-controls-panel {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #ff00ff;
+            border-radius: 5px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .audio-control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .audio-icon-btn {
+            background: none;
+            border: none;
+            color: #00ffcc;
+            cursor: pointer;
+            font-size: 18px;
+            width: 25px;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+
+        .audio-icon-btn:hover {
+            transform: scale(1.2);
+            text-shadow: 0 0 5px #00ffcc;
+        }
+
+        .audio-icon-btn.muted {
+            color: #ff0066;
+            text-shadow: 0 0 5px #ff0066;
+        }
+
+        /* Custom Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100px;
+            background: transparent;
+        }
+
+        input[type=range]:focus {
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: rgba(255, 0, 255, 0.3);
+            border-radius: 2px;
+            border: 1px solid #ff00ff;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: #00ffcc;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -6px; /* center on track */
+            box-shadow: 0 0 5px #00ffcc;
+        }
+
+        input[type=range]:focus::-webkit-slider-runnable-track {
+            background: rgba(255, 0, 255, 0.5);
         }
 
         .start-screen, .phase-complete, .game-complete {
@@ -290,12 +377,27 @@
             80% { transform: translate(1px, 1px); }
         }
     </style>
+<link rel="stylesheet" href="/index.css">
 </head>
 <body>
     <div class="game-container">
         <div class="cyber-grid"></div>
-        <div class="score-display hidden">
-            💯 Score: <span id="score">0</span> / <span id="total">0</span>
+        
+        <div class="header-controls">
+            <div class="score-display hidden" id="scoreBoard">
+                💯 Score: <span id="score">0</span> / <span id="total">0</span>
+            </div>
+            
+            <div class="audio-controls-panel">
+                <div class="audio-control-group" title="Background Music">
+                    <button class="audio-icon-btn" id="bgmToggle" onclick="toggleBGM()">🎵</button>
+                    <input type="range" id="bgmSlider" min="0" max="100" value="50" oninput="setBGMVolume(this.value)">
+                </div>
+                <div class="audio-control-group" title="Sound Effects">
+                    <button class="audio-icon-btn" id="sfxToggle" onclick="toggleSFX()">🔊</button>
+                    <input type="range" id="sfxSlider" min="0" max="100" value="80" oninput="setSFXVolume(this.value)">
+                </div>
+            </div>
         </div>
         
         <div class="game-content">
@@ -312,6 +414,9 @@
                     ⚠️ 12 visitors await inspection across 3 security levels ⚠️
                 </p>
                 <button class="start-btn" onclick="startGame()">🚀 BEGIN INSPECTION</button>
+                <p style="margin-top: 15px; font-size: 12px; color: #00ffcc; opacity: 0.7;">
+                    (Headphones Recommended: 8-Bit Cyberpunk Theme)
+                </p>
             </div>
 
             <div id="gameScreen" class="hidden">
@@ -362,6 +467,318 @@
     </div>
 
     <script>
+        // --- AUDIO SYSTEM ---
+        const audioState = {
+            ctx: null,
+            bgmGainNode: null,
+            sfxGainNode: null,
+            
+            // State
+            initialized: false,
+            bgmMuted: false,
+            sfxMuted: false,
+            bgmVolume: 0.5, // Normalized 0-1 from slider
+            sfxVolume: 0.8, // Normalized 0-1 from slider
+            
+            // Sequencer state
+            nextNoteTime: 0.0,
+            currentStep: 0,
+            tempo: 150, // Faster, NES action style
+            lookahead: 25.0, // ms to sleep
+            scheduleAheadTime: 0.1, // seconds to schedule ahead
+            timerID: null
+        };
+
+        // Extended Notes Frequency Table
+        const NOTES = {
+            Bb1: 58.27, C2: 65.41, Db2: 69.30, D2: 73.42, Eb2: 77.78, F2: 87.31, G2: 98.00, Ab2: 103.83, A2: 110.00, Bb2: 116.54, B2: 123.47,
+            C3: 130.81, Db3: 138.59, D3: 146.83, Eb3: 155.56, F3: 174.61, G3: 196.00, Ab3: 207.65, Bb3: 233.08, B3: 246.94,
+            C4: 261.63, Db4: 277.18, D4: 293.66, Eb4: 311.13, F4: 349.23, G4: 392.00, Ab4: 415.30, Bb4: 466.16, B4: 493.88,
+            C5: 523.25, D5: 587.33, Eb5: 622.25, F5: 698.46, G5: 783.99
+        };
+
+        let noiseBuffer = null;
+
+        // 64-step (4 bar) Loop - Digital Noir / Detective Theme
+        const SEQ_LENGTH = 64;
+
+        // 1 = Kick, 2 = Snare/Clap, 3 = Closed Hat, 4 = Open Hat
+        const DRUM_SEQ = [
+            // Bar 1
+            1, 3, 3, 0,  2, 3, 0, 1,  1, 3, 3, 0,  2, 3, 4, 0,
+            // Bar 2
+            1, 3, 3, 0,  2, 3, 0, 1,  1, 3, 1, 0,  2, 3, 4, 3,
+            // Bar 3
+            1, 3, 3, 0,  2, 3, 0, 1,  1, 3, 3, 0,  2, 3, 4, 0,
+            // Bar 4 (Break)
+            1, 3, 3, 0,  2, 3, 1, 0,  2, 2, 2, 0,  4, 0, 1, 0
+        ];
+
+        const BASS_SEQ = [
+            // Bar 1 (C Minor driving)
+            'C2', null, 'C2', null, 'G2', null, 'C2', null, 'Eb2', null, 'C2', null, 'F2', null, 'Bb1', null,
+            // Bar 2
+            'C2', null, 'C2', null, 'G2', null, 'C2', null, 'Eb2', null, 'C2', null, 'G2', 'F2', 'Eb2', 'D2',
+            // Bar 3 (Ab Major lift)
+            'Ab2', null, 'Ab2', null, 'Eb2', null, 'Ab2', null, 'C3', null, 'Ab2', null, 'Db3', null, 'Eb3', null,
+            // Bar 4 (G Dominant turnaround)
+            'G2', null, 'G2', null, 'D2', null, 'G2', null, 'B2', null, 'G2', null, 'G2', null, 'G2', null
+        ];
+
+        const MELODY_SEQ = [
+            // Bar 1 (Main Motif)
+            'C4', null, 'Eb4', null, 'G4', null, null, null, 'F4', null, 'Eb4', null, 'D4', null, 'C4', null,
+            // Bar 2
+            'Bb3', null, 'C4', null, null, null, null, null, 'G3', null, null, null, 'Eb4', 'D4', 'C4', 'Bb3',
+            // Bar 3 (Rising Tension)
+            'Ab3', null, 'C4', null, 'Eb4', null, null, null, 'Db4', null, 'C4', null, 'Bb3', null, 'Ab3', null,
+            // Bar 4 (Resolution/Loop)
+            'G3', null, 'B3', null, 'D4', null, 'F4', null, 'G4', null, 'F4', null, 'D4', null, 'B3', null
+        ];
+
+        function createNoiseBuffer(ctx) {
+            const bufferSize = ctx.sampleRate * 2; // 2 seconds of noise
+            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            return buffer;
+        }
+
+        function initAudio() {
+            if (audioState.initialized) return;
+
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioState.ctx = new AudioContext();
+            
+            // Generate resources
+            noiseBuffer = createNoiseBuffer(audioState.ctx);
+
+            // BGM Master Gain (Max Volume scaling factor = 0.3 for balance)
+            audioState.bgmGainNode = audioState.ctx.createGain();
+            updateBGMGain(); // Set initial value based on slider
+            audioState.bgmGainNode.connect(audioState.ctx.destination);
+
+            // SFX Master Gain
+            audioState.sfxGainNode = audioState.ctx.createGain();
+            updateSFXGain(); // Set initial value based on slider
+            audioState.sfxGainNode.connect(audioState.ctx.destination);
+
+            // Initialize Sequencer
+            audioState.nextNoteTime = audioState.ctx.currentTime + 0.1;
+            scheduler();
+            
+            audioState.initialized = true;
+        }
+
+        // --- Volume Controls ---
+
+        function updateBGMGain() {
+            if (!audioState.bgmGainNode) return;
+            const maxVol = 0.3; // Limit max BGM so it's not too loud
+            const target = audioState.bgmMuted ? 0 : (audioState.bgmVolume * maxVol);
+            
+            // Smooth transition
+            if (audioState.ctx) {
+                audioState.bgmGainNode.gain.setTargetAtTime(target, audioState.ctx.currentTime, 0.05);
+            }
+        }
+
+        function updateSFXGain() {
+            if (!audioState.sfxGainNode) return;
+            const maxVol = 1.0; 
+            const target = audioState.sfxMuted ? 0 : (audioState.sfxVolume * maxVol);
+            
+            if (audioState.ctx) {
+                audioState.sfxGainNode.gain.setTargetAtTime(target, audioState.ctx.currentTime, 0.05);
+            }
+        }
+
+        function toggleBGM() {
+            ensureAudioContext();
+            audioState.bgmMuted = !audioState.bgmMuted;
+            updateBGMGain();
+            
+            const btn = document.getElementById('bgmToggle');
+            if (audioState.bgmMuted) {
+                btn.textContent = '🔇';
+                btn.classList.add('muted');
+            } else {
+                btn.textContent = '🎵';
+                btn.classList.remove('muted');
+            }
+        }
+
+        function toggleSFX() {
+            ensureAudioContext();
+            audioState.sfxMuted = !audioState.sfxMuted;
+            updateSFXGain();
+
+            const btn = document.getElementById('sfxToggle');
+            if (audioState.sfxMuted) {
+                btn.textContent = '🔇';
+                btn.classList.add('muted');
+            } else {
+                btn.textContent = '🔊';
+                btn.classList.remove('muted');
+            }
+        }
+
+        function setBGMVolume(val) {
+            ensureAudioContext();
+            audioState.bgmVolume = val / 100;
+            // If dragging slider, assume user wants to hear it
+            if (audioState.bgmMuted && audioState.bgmVolume > 0) {
+                toggleBGM(); // Unmute if moving slider up
+            }
+            updateBGMGain();
+        }
+
+        function setSFXVolume(val) {
+            ensureAudioContext();
+            audioState.sfxVolume = val / 100;
+            if (audioState.sfxMuted && audioState.sfxVolume > 0) {
+                toggleSFX();
+            }
+            updateSFXGain();
+            // Play a test click occasionally while dragging? No, might be annoying.
+        }
+        
+        function ensureAudioContext() {
+            if (!audioState.initialized) {
+                initAudio();
+            }
+            if (audioState.ctx && audioState.ctx.state === 'suspended') {
+                audioState.ctx.resume();
+            }
+        }
+
+        // --- Sequencer Logic ---
+
+        function nextStep() {
+            const secondsPerBeat = 60.0 / audioState.tempo;
+            audioState.nextNoteTime += 0.25 * secondsPerBeat; // 16th notes
+            audioState.currentStep = (audioState.currentStep + 1) % SEQ_LENGTH;
+        }
+
+        function scheduleNote(step, time) {
+            // Note: We don't check isMuted here anymore, we schedule everything and let the gain node handle silence.
+            // This keeps the sequencer in sync even when muted.
+
+            // --- DRUMS ---
+            const drum = DRUM_SEQ[step];
+            if (drum) {
+                const drumGain = audioState.ctx.createGain();
+                drumGain.connect(audioState.bgmGainNode); // Connect to BGM bus
+
+                if (drum === 1) { // Kick
+                    const osc = audioState.ctx.createOscillator();
+                    osc.type = 'triangle'; 
+                    osc.frequency.setValueAtTime(150, time);
+                    osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.5);
+                    drumGain.gain.setValueAtTime(0.8, time);
+                    drumGain.gain.exponentialRampToValueAtTime(0.01, time + 0.5);
+                    osc.connect(drumGain);
+                    osc.start(time);
+                    osc.stop(time + 0.5);
+                } else if (drum >= 2) { // Snare/Hats (Noise)
+                    const noise = audioState.ctx.createBufferSource();
+                    noise.buffer = noiseBuffer;
+                    
+                    const filter = audioState.ctx.createBiquadFilter();
+                    filter.type = drum === 2 ? 'lowpass' : 'highpass';
+                    filter.frequency.value = drum === 2 ? 1500 : 5000;
+                    
+                    noise.connect(filter);
+                    filter.connect(drumGain);
+                    
+                    const decay = drum === 4 ? 0.2 : 0.05; 
+                    const vol = drum === 2 ? 0.4 : 0.2;
+
+                    drumGain.gain.setValueAtTime(vol, time);
+                    drumGain.gain.exponentialRampToValueAtTime(0.01, time + decay);
+                    
+                    noise.start(time);
+                    noise.stop(time + decay);
+                }
+            }
+
+            // --- BASS ---
+            const bassNote = BASS_SEQ[step];
+            if (bassNote) {
+                const osc = audioState.ctx.createOscillator();
+                const gain = audioState.ctx.createGain();
+                osc.type = 'triangle'; 
+                osc.frequency.setValueAtTime(NOTES[bassNote], time);
+                
+                gain.gain.setValueAtTime(0.3, time);
+                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.2); 
+                
+                osc.connect(gain);
+                gain.connect(audioState.bgmGainNode); // Connect to BGM bus
+                osc.start(time);
+                osc.stop(time + 0.2);
+            }
+
+            // --- MELODY ---
+            const melodyNote = MELODY_SEQ[step];
+            if (melodyNote) {
+                const osc = audioState.ctx.createOscillator();
+                const gain = audioState.ctx.createGain();
+                osc.type = 'square'; 
+                osc.frequency.setValueAtTime(NOTES[melodyNote], time);
+                
+                gain.gain.setValueAtTime(0.15, time);
+                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.15); 
+                
+                osc.connect(gain);
+                gain.connect(audioState.bgmGainNode); // Connect to BGM bus
+                osc.start(time);
+                osc.stop(time + 0.15);
+            }
+        }
+
+        function scheduler() {
+            while (audioState.nextNoteTime < audioState.ctx.currentTime + audioState.scheduleAheadTime) {
+                scheduleNote(audioState.currentStep, audioState.nextNoteTime);
+                nextStep();
+            }
+            audioState.timerID = window.setTimeout(scheduler, audioState.lookahead);
+        }
+
+        function playClickSound() {
+            if (!audioState.initialized) {
+                initAudio();
+            }
+            if (audioState.ctx.state === 'suspended') {
+                audioState.ctx.resume();
+            }
+            
+            // SFX is handled by the sfxGainNode mute/volume state, so we just fire.
+            
+            const t = audioState.ctx.currentTime;
+            
+            // 8-bit Interaction Sound (High Pitch Arp)
+            const osc = audioState.ctx.createOscillator();
+            const gain = audioState.ctx.createGain();
+            
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(880, t); // A5
+            osc.frequency.setValueAtTime(1174, t + 0.05); // D6
+            
+            gain.gain.setValueAtTime(0.05, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+            
+            osc.connect(gain);
+            gain.connect(audioState.sfxGainNode); // Connect to SFX bus
+            
+            osc.start(t);
+            osc.stop(t + 0.1);
+        }
+
+        // --- GAME LOGIC ---
+
         // Game State
         let gameState = {
             currentPhase: 1,
@@ -696,11 +1113,25 @@
             ]
         };
 
+        // Initialize Audio on user interaction with the whole document if not started, 
+        // but specifically hook it to buttons
+        document.addEventListener('click', (e) => {
+            if(e.target.tagName === 'BUTTON') {
+                playClickSound();
+            }
+            if(!audioState.initialized) {
+                initAudio();
+            }
+        });
+
         // Game Functions
         function startGame() {
+            // Initialize Audio Context on first interaction
+            ensureAudioContext();
+
             document.getElementById('startScreen').classList.add('hidden');
             document.getElementById('gameScreen').classList.remove('hidden');
-            document.querySelector('.score-display').classList.remove('hidden');
+            document.getElementById('scoreBoard').classList.remove('hidden');
             gameState.currentPhase = 1;
             gameState.currentNPC = 0;
             gameState.score = 0;
@@ -759,7 +1190,8 @@
                         const btn = document.createElement('button');
                         btn.className = 'question-btn';
                         btn.innerHTML = `❓ ${q.q}`;
-                        btn.onclick = () => askQuestion(npc, index);
+                        // Onclick already triggers playClickSound via global listener
+                        btn.addEventListener('click', () => askQuestion(npc, index));
                         container.appendChild(btn);
                     }
                 });
@@ -774,8 +1206,12 @@
             
             // Add to dialogue
             addDialogue('player', question.q);
+            
+            // Simulate typing delay
             setTimeout(() => {
                 addDialogue('npc', question.a);
+                // Optional: Play a different soft sound for incoming message? 
+                // Keeping it simple for now to avoid noise clutter.
                 
                 gameState.currentDialogue.push({ questionIndex });
                 gameState.questionsAsked++;
@@ -930,7 +1366,7 @@
         function showGameComplete() {
             document.getElementById('phaseComplete').classList.add('hidden');
             document.getElementById('gameComplete').classList.remove('hidden');
-            document.querySelector('.score-display').classList.add('hidden');
+            document.getElementById('scoreBoard').classList.add('hidden');
             
             const accuracy = Math.round(gameState.score / gameState.totalAttempts * 100);
             let rank = '🥉 Bronze Inspector';
@@ -971,5 +1407,6 @@
             document.getElementById('startScreen').classList.remove('hidden');
         }
     </script>
+<script type="module" src="/index.tsx"></script>
 </body>
 </html>
